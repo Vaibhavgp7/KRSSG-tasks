@@ -48,6 +48,7 @@ class RRT:
         self.node_list1 = []
         self.node_list2 = []
         
+    """function for connecting the generated trees"""
     def conntrees(self):
         rece = self.planning()
         print(rece[0].x,rece[0].y,rece[1].x,rece[1].y)
@@ -119,19 +120,8 @@ class RRT:
                 con = self.connect(s,g)
                 if self.check_collision(con,self.cnts):
                     return (path1 + self.generate_final_course(s,g,self.node_list1.index(s),self.node_list2.index(g)) + path2)
-        """
-        for n in self.node_list1:
-            print(n.x,n.y)
-        print("break")
-        for n in self.node_list2:
-            print(n.x,n.y)
-        print("break")
-        for n in self.node_list3:
-            print(n.x,n.y)
-        print("break")
-        for n in self.node_list4:
-            print(n.x,n.y)"""
-        return path1      
+       
+        return None     
         
     def planning(self):
         
@@ -413,6 +403,7 @@ inxs = input("Enter source number : ")    #number should be 0,1 or 2
 inxs = int(inxs)
 inxd = input("Enter destination number : ")    #number should be  0,1 or 2
 inxd = int(inxd)
+
 rrt = RRT(source[inxs],dest[inxd],rand_area=[w,h],cnts = cnts)
 path = rrt.conntrees()
 print(path)
