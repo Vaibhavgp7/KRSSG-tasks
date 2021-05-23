@@ -316,14 +316,6 @@ def main():
     rrt = RRT(start,goal,rand_area=[0,600],cnts = cnts)
     path = rrt.planning()
     print(path)
-    
-    """for i in range(len(path)):
-        if path[i] == path[-1]:
-            break
-        
-        cv2.line(image,(path[i][0],path[i][1]),(path[i+1][0],path[i+1][1]),(0,255,255),1)
-    cv2.imshow('join',image)
-    cv2.waitKey(0)"""
     plt.plot([x for (x, y) in path], [y for (x, y) in path], 'r--')
     plt.imshow(image)
     plt.show()
