@@ -94,12 +94,10 @@ for i in range(t):
     q = rec.decode('utf-8')
     if len(q) != 15 :
         print("Invalid input")
-        i -= 1
         continue
     input_string = list(map(int,q.split()))
     if (input_string.count(1) + input_string.count(0))!= 8:
         print("Invalid input")
-        i -= 1
         continue
     queue = []
     for k in range(0,8):
