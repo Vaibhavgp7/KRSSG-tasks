@@ -28,11 +28,11 @@ class RRT:
                  start,
                  goal,
                  cnts,
+                 image,
                  rand_area,
                  expand_dis=200.0,
                  path_resolution=0.5,
-                 circle_radius=300.0,
-                 search_until_max_iter=False):
+                 circle_radius=300.0):
         
         self.start = self.Node(start[0], start[1])
         self.end = self.Node(goal[0], goal[1])
@@ -42,46 +42,81 @@ class RRT:
         self.path_resolution = path_resolution
         self.circle_radius = circle_radius
         self.cnts = cnts
+        self.image = image
         self.node_list = []
-        self.search_until_max_iter = search_until_max_iter
 
+    def conntrees(self):
+        rece = self.planning()
+        print(rece[0].x,rece[0].y,rece[1].x,rece[1].y)
+        path1 = []
+        path2 = []
+        node = rece[0]
+        while node.parent is not None:
+            path1.append([node.x, node.y])
+            node = node.parent
+        path1.append([self.start.x,self.start.y])
+        path1 = [node for node in reversed(path1)]
+        node = rece[1]
+        while node.parent is not None:
+            path2.append([node.x,node.y])
+            node = node.parent
+        path2.append([self.end.x,self.end.y])
+        return path1+path2
     def planning(self):
         
         self.node_list1 = [self.start]
         self.node_list2 = [self.end]
-        for i in range(500):
+        print(len(self.node_list2))
+        for i in range(300):
             
             rnd = self.get_random_node(self.cnts)
-            rec = self.get_nearest_node_index(self.node_list1,self.node_list2, rnd)
+            rec = self.get_nearest_node_index(rnd)
             if rec[0] == 1:
                 near_node = self.node_list1[rec[1]]
                 new_node = self.steer(self.node_list1[rec[1]], rnd,self.expand_dis)
-                check = [1,new_node,near_node]
+                check = 1
             else:
                 new_node = self.steer(self.node_list2[rec[1]], rnd,self.expand_dis)
                 near_node = self.node_list2[rec[1]]
-                check = [2,new_node,near_node]
+                check = 2
             new_node.cost = near_node.cost +  math.hypot(new_node.x-near_node.x, new_node.y-near_node.y)
             if self.check_collision(new_node, self.cnts):
                 near_inds = self.find_near_nodes(new_node,check)
                 node_with_updated_parent = self.parent(new_node, near_inds,check)
                 if node_with_updated_parent:
                     self.rewire(node_with_updated_parent, near_inds,check)
-                    if check[0]==1:
+                    if check==1:
                         self.node_list1.append(node_with_updated_parent)
+                        self.image = cv2.line(self.image,(math.floor(node_with_updated_parent.parent.x),math.floor(node_with_updated_parent.parent.y)),(math.floor(node_with_updated_parent.x),math.floor(node_with_updated_parent.y)),(0,255,255),1)
+                        cv2.imshow('Tree',self.image)
+                        cv2.waitKey(10)
                     else:
                         self.node_list2.append(node_with_updated_parent)
+                        self.image = cv2.line(self.image,(math.floor(node_with_updated_parent.parent.x),math.floor(node_with_updated_parent.parent.y)),(math.floor(node_with_updated_parent.x),math.floor(node_with_updated_parent.y)),(0,255,255),1)
+                        cv2.imshow('Tree',self.image)
+                        cv2.waitKey(10)
                 else:
-                    if check[0]==1:
+                    if check==1:
                         self.node_list1.append(new_node)
+                        self.image = cv2.line(self.image,(math.floor(new_node.parent.x),math.floor(new_node.parent.y)),(math.floor(new_node.x),math.floor(new_node.y)),(0,255,255),1)
+                        cv2.imshow('Tree',self.image)
+                        cv2.waitKey(10)
                     else:
                         self.node_list2.append(new_node)
+                        self.image = cv2.line(self.image,(math.floor(new_node.parent.x),math.floor(new_node.parent.y)),(math.floor(new_node.x),math.floor(new_node.y)),(0,255,255),1)
+                        cv2.imshow('Tree',self.image)
+                        cv2.waitKey(10)
+        a = float("inf")
         for s in self.node_list1:
             for g in self.node_list2:
-                con = self.connect(s,g)
-                if self.check_collision(con,self.cnts):
-                    return self.generate_final_course(s,g,self.node_list1.index(s),self.node_list2.index(g))
-        return None            
+                path = self.connect(s,g)
+                if self.check_collision(path,self.cnts):
+                    if s.cost+g.cost+math.hypot(s.x-g.x,s.y-g.y)<a:
+                        first = s
+                        second = g
+                        a = s.cost+g.cost+math.hypot(s.x-g.x,s.y-g.y)
+                
+        return (first,second)
 
     def parent(self, new_node, near_inds,check):
         if not near_inds:
@@ -90,7 +125,7 @@ class RRT:
         # search nearest cost in near_inds
         costs = []
         for i in near_inds:
-            if check[0]==1:
+            if check==1:
                 near_node = self.node_list1[i]
                 t_node = self.steer(near_node, new_node)
             else:
@@ -109,7 +144,7 @@ class RRT:
             return None
 
         min_ind = near_inds[costs.index(min_cost)]
-        if check[0] == 1:
+        if check == 1:
             new_node = self.steer(self.node_list1[min_ind], new_node)
         else:
             new_node = self.steer(self.node_list2[min_ind], new_node)
@@ -165,23 +200,6 @@ class RRT:
         new_node.y = to_node.y
         return new_node
 
-    def generate_final_course(self,s,g,goal_ind1,goal_ind2):
-        path = []
-        node = self.node_list1[goal_ind1]
-        while node.parent is not None:
-            path.append([node.x, node.y])
-            node = node.parent
-        path.append([self.start.x,self.start.y])
-        path = [node for node in reversed(path)]
-        node = self.node_list2[goal_ind2]
-        while node.parent is not None:
-            path.append([node.x,node.y])
-            node = node.parent
-        path.append([self.end.x,self.end.y])  
-        
-
-        return path
-
     def calc_dist_to_goal(self, x, y):
         dx = x - self.end.x
         dy = y - self.end.y
@@ -189,7 +207,7 @@ class RRT:
 
     def get_random_node(self,cnts):
         rnd = self.Node(random.randint(self.min_rand, self.max_rand),random.randint(self.min_rand, self.max_rand))
-        print(rnd)
+        
         lst = []
         for c in cnts:
             result = cv2.pointPolygonTest(c, (rnd.x,rnd.y), False)
@@ -200,16 +218,18 @@ class RRT:
             return self.get_random_node(cnts)
             
         
-    def get_nearest_node_index(self,node_list1,node_list2,rnd):
-        for node in node_list1:
-            dlist1 = []
+    def get_nearest_node_index(self,rnd):
+        dlist1 = []
+        dlist2 = []
+        for node in self.node_list1:
             dlist1.append((node.x - rnd.x)**2 + (node.y - rnd.y)**2)
-        minind1 = dlist1.index(min(dlist1))
-        for node in node_list2:
-            dlist2 = []
+        min1 = min(dlist1,key=lambda x:float(x))
+        minind1 = dlist1.index(min1)
+        for node in self.node_list2:
             dlist2.append((node.x - rnd.x)**2 + (node.y - rnd.y)**2)
-        minind2 = dlist2.index(min(dlist2))
-        if min(dlist1) >= min(dlist2):
+        min2 = min(dlist2,key=lambda x:float(x))
+        minind2 = dlist2.index(min2)
+        if min(dlist1) <= min(dlist2):
             return (1,minind1)
         else:
             return (2,minind2)
@@ -236,7 +256,7 @@ class RRT:
         theta = math.atan2(dy, dx)
         return d, theta
     def find_near_nodes(self, new_node,check):
-        if check[0] == 1:
+        if check == 1:
             dist_list = [(node.x - new_node.x)**2 + (node.y - new_node.y)**2
                      for node in self.node_list1]
         else:
@@ -249,7 +269,7 @@ class RRT:
 
     def rewire(self, new_node, near_inds,check):
         for i in near_inds:
-            if check[0]==1:
+            if check==1:
                 near_node = self.node_list1[i]
                 edge_node = self.steer(new_node, near_node)
             else:
@@ -269,7 +289,7 @@ class RRT:
                 near_node.path_x = edge_node.path_x
                 near_node.path_y = edge_node.path_y
                 near_node.parent = edge_node.parent
-                self.propagate_cost_to_leaves(new_node,check[0])
+                self.propagate_cost_to_leaves(new_node,check)
 
     def calc_new_cost(self, from_node, to_node):
         d, _ = self.calc_distance_and_angle(from_node, to_node)
@@ -280,14 +300,12 @@ class RRT:
             for node in self.node_list1:
                 if node.parent == parent_node:
                     node.cost = self.calc_new_cost(parent_node, node)
-                    self.propagate_cost_to_leaves(node)
+                    self.propagate_cost_to_leaves(node,c)
         else:
             for node in self.node_list2:
                 if node.parent == parent_node:
                     node.cost = self.calc_new_cost(parent_node, node)
-                    self.propagate_cost_to_leaves(node)
-        
-
+                    self.propagate_cost_to_leaves(node,c)
 
 def main():
 
@@ -313,15 +331,12 @@ def main():
     goal = [gX,gY]
     # ====Search Path with RRT====
     
-    rrt = RRT(start,goal,rand_area=[0,600],cnts = cnts)
-    path = rrt.planning()
+    rrt = RRT(start,goal,rand_area=[0,600],cnts = cnts,image=image)
+    path = rrt.conntrees()
     print(path)
-    plt.plot([x for (x, y) in path], [y for (x, y) in path], 'r--')
+    
+    plt.plot([x for (x, y) in path], [y for (x, y) in path], 'r-')
     plt.imshow(image)
     plt.show()
-    
-    
-
-    
 if __name__ == '__main__':
     main()
